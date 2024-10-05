@@ -1,0 +1,17 @@
+POST http://localhost:3000/users/register
+Content-Type: application/json
+
+{
+    "fullName": "Oluwafemi Ojuri",
+    "email": "ojurifemi132@gmail.com",
+    "phoneNumber": "+2348168036131",
+    "password": "Adedotun123@"
+}
+
+POST http://localhost:3000/users/login
+Content-Type: application/json
+
+{
+    "email": "ojurifemi132@gmail.com",
+    "password": "Adedotun123@"
+}

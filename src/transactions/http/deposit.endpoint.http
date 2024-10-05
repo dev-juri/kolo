@@ -1,0 +1,7 @@
+POST http://localhost:3000/transactions/deposit
+Content-Type: application/json
+
+{
+    "userId": 1,
+    "amount": 2000.28
+}

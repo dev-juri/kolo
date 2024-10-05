@@ -1,7 +1,9 @@
 import {
   ConflictException,
+  HttpCode,
   HttpStatus,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   RequestTimeoutException,
 } from '@nestjs/common';
@@ -10,16 +12,26 @@ import { Transaction } from '../entities/transactions.entity';
 import { Repository } from 'typeorm';
 import { User } from 'src/users/entities/user.entity';
 import { ConfigService } from '@nestjs/config';
-import axios from 'axios';
-import { PAYSTACK_INIT_TRANSACTION } from 'src/constants';
+import axios, { AxiosResponse } from 'axios';
+import {
+  PAYSTACK_INIT_TRANSACTION,
+  PAYSTACK_SUCCESS_STATUS,
+  PAYSTACK_TRANSACTION_VERIFY_BASE_URL,
+  PAYSTACK_WEBHOOK_CRYPTO_ALGO,
+} from 'src/constants';
 import { DepositDto } from '../dtos/deposit.dto';
 import { UsersService } from 'src/users/providers/users.service';
 import { transactionType } from '../enums/transactionType.enum';
 import { TransactionDto } from '../dtos/transaction.dto';
 import {
+  PaystackCallbackDto,
   PaystackCreateTransactionDto,
   PaystackCreateTransactionResponseDto,
+  PaystackVerifyTransactionResponseDto,
+  PaystackWebhookDto,
 } from '../dtos/paystack-res.dto';
+import { createHmac, timingSafeEqual } from 'crypto';
+import { transactionStatus } from '../enums/transactionStatus.enum';
 
 @Injectable()
 export class TransactionsService {
@@ -68,11 +80,10 @@ export class TransactionsService {
       });
       result = response.data;
     } catch (error) {
-      console.log(error);
     }
 
     if (!result)
-      throw new RequestTimeoutException(
+      throw new InternalServerErrorException(
         'Unable to checkout to payment gateway',
       );
 
@@ -92,7 +103,9 @@ export class TransactionsService {
         ],
       });
     } catch (error) {
-      throw new RequestTimeoutException('Unable to connect to the database');
+      throw new InternalServerErrorException(
+        'Unable to connect to the database',
+      );
     }
 
     if (txnExists)
@@ -106,12 +119,12 @@ export class TransactionsService {
 
     const newTxn = this.txnRepository.create(txn);
 
-    console.log(newTxn);
     try {
       await this.txnRepository.save(newTxn);
     } catch (error) {
-      console.log(error);
-      throw new RequestTimeoutException('Unable to connect to the database');
+      throw new InternalServerErrorException(
+        'Unable to connect to the database',
+      );
     }
 
     return {
@@ -121,5 +134,105 @@ export class TransactionsService {
         authorization_url: result.data.authorization_url,
       },
     };
+  }
+
+  async verifyTransaction(ref: string): Promise<Transaction | null> {
+    const transaction = await this.txnRepository.findOne({
+      where: {
+        transaction_ref: ref,
+      },
+    });
+
+    if (!transaction) {
+      return null;
+    }
+    if (transaction.status == transactionStatus.SUCCESSFUL) {
+      return transaction;
+    }
+
+    const url = `${PAYSTACK_TRANSACTION_VERIFY_BASE_URL}/${ref}`;
+    let response: AxiosResponse<PaystackVerifyTransactionResponseDto>;
+
+    try {
+      response = await axios.get<PaystackVerifyTransactionResponseDto>(url, {
+        headers: {
+          Authorization: `Bearer ${this.configService.get<string>(
+            'paystackConfig.secretKey',
+          )}`,
+        },
+      });
+    } catch (error) {}
+
+    if (!response) {
+      return null;
+    }
+
+    const result = response.data;
+
+    const txnStatus = result?.data?.status;
+    const paymentConfirmed = txnStatus === PAYSTACK_SUCCESS_STATUS;
+
+    if (paymentConfirmed) {
+      transaction.status = transactionStatus.SUCCESSFUL;
+
+      transaction.user = await this.usersService.updateUserBalance(
+        transaction.amount,
+        transaction.user.id,
+      );
+    } else {
+      transaction.status = transactionStatus.FAILED;
+    }
+
+    delete transaction.user.password;
+
+    return await this.txnRepository.save(transaction);
+  }
+
+  async handlePaystackWebhook(
+    dto: PaystackWebhookDto,
+    signature: string,
+  ): Promise<boolean> {
+    if (!dto.data) {
+      return false;
+    }
+
+    let isValidEvent = false;
+
+    try {
+      const hash = createHmac(
+        PAYSTACK_WEBHOOK_CRYPTO_ALGO,
+        this.configService.get<string>('paystack.secretKey'),
+      )
+        .update(JSON.stringify(dto))
+        .digest('hex');
+
+      isValidEvent =
+        hash &&
+        signature &&
+        timingSafeEqual(Buffer.from(hash), Buffer.from(signature));
+    } catch (error) {}
+
+    if (!isValidEvent) {
+      return false;
+    }
+
+    const transaction = await this.txnRepository.findOne({
+      where: {
+        transaction_ref: dto.data.reference,
+      },
+    });
+
+    const txnStatus = dto.data.status;
+    const paymentConfirmed = txnStatus === PAYSTACK_SUCCESS_STATUS;
+
+    if (paymentConfirmed) {
+      transaction.status = transactionStatus.SUCCESSFUL;
+    } else {
+      transaction.status = transactionStatus.FAILED;
+    }
+
+    await this.txnRepository.save(transaction);
+
+    return true;
   }
 }

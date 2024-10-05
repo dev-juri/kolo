@@ -1,10 +1,9 @@
 import {
   BadRequestException,
-  HttpCode,
   HttpStatus,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
-  RequestTimeoutException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -43,7 +42,9 @@ export class UsersService {
     try {
       await this.usersRepository.save(newUser);
     } catch (error) {
-      throw new RequestTimeoutException('Unable to connect to the database');
+      throw new InternalServerErrorException(
+        'Unable to connect to the database',
+      );
     }
     delete newUser.password;
 
@@ -64,7 +65,9 @@ export class UsersService {
         where: { email: email },
       });
     } catch (error) {
-      throw new RequestTimeoutException('Unable to connect to the database');
+      throw new InternalServerErrorException(
+        'Unable to connect to the database',
+      );
     }
 
     if (!user) throw new NotFoundException('User not found');
@@ -92,9 +95,30 @@ export class UsersService {
         },
       });
     } catch (error) {
-      throw new RequestTimeoutException('Unable to connect to the database');
+      throw new InternalServerErrorException(
+        'Unable to connect to the database',
+      );
     }
 
     return user;
+  }
+
+  async updateUserBalance(amount: number, userId: number) {
+    let user = undefined;
+
+    try {
+      user = await this.usersRepository.findOne({
+        where: {
+          id: userId,
+        },
+      });
+    } catch (error) {
+      throw new InternalServerErrorException(
+        'Unable to connect to the database',
+      );
+    }
+    user.balance = Number(user.balance) + Number(amount);
+
+    return await this.usersRepository.save(user);
   }
 }

@@ -1,6 +1,22 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { TransactionsService } from './providers/transactions.service';
 import { DepositDto } from './dtos/deposit.dto';
+import { PAYSTACK_WEBHOOK_SIGNATURE_KEY } from 'src/constants';
+import {
+  PaystackCallbackDto,
+  PaystackWebhookDto,
+} from './dtos/paystack-res.dto';
+import { Transaction } from './entities/transactions.entity';
 
 @Controller('transactions')
 export class TransactionsController {
@@ -9,5 +25,28 @@ export class TransactionsController {
   @Post('deposit')
   public deposit(@Body() depositDto: DepositDto) {
     return this.transactionsService.initTransaction(depositDto);
+  }
+
+  @Get('/callback')
+  async verifyTransaction(
+    @Query('reference') reference: string,
+  ): Promise<Transaction> {
+    return await this.transactionsService.verifyTransaction(reference);
+  }
+
+  @Post('/webhook')
+  @HttpCode(HttpStatus.OK)
+  async paymentWebhookHandler(
+    @Body() dto: PaystackWebhookDto,
+    @Headers() headers = {},
+  ) {
+    const result = await this.transactionsService.handlePaystackWebhook(
+      dto,
+      `${headers[PAYSTACK_WEBHOOK_SIGNATURE_KEY]}`,
+    );
+
+    if (!result) {
+      throw new BadRequestException();
+    }
   }
 }

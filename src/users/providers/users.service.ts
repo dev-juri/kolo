@@ -85,7 +85,7 @@ export class UsersService {
     };
   }
 
-  async findUser(userId: number): Promise<User> {
+  async findUser(userId: number): Promise<User> | null {
     let user = undefined;
 
     try {

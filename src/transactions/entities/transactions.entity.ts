@@ -38,14 +38,14 @@ export class Transaction {
   @Column({
     nullable: false,
     type: 'varchar',
-    unique: true
+    unique: true,
   })
   transaction_ref: string;
 
   @Column({
     nullable: false,
     type: 'varchar',
-    unique: true
+    unique: true,
   })
   access_code: string;
 
@@ -54,6 +54,24 @@ export class Transaction {
 
   @UpdateDateColumn()
   update: Date;
+
+  @Column({
+    nullable: true,
+    type: 'varchar',
+  })
+  accountName?: string;
+
+  @Column({
+    nullable: true,
+    type: 'varchar',
+  })
+  accountNumber?: string;
+
+  @Column({
+    nullable: true,
+    type: 'varchar',
+  })
+  remarks?: string;
 
   @ManyToOne(() => User, (user) => user.transactions, {
     eager: true,

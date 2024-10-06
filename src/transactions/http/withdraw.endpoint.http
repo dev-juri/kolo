@@ -1,0 +1,9 @@
+POST http://localhost:3000/transactions/withdraw
+Content-Type: application/json
+
+{
+    "userId": 1,
+    "accountName": "Ojuri Oluwafemi",
+    "accountNumber": "0449541114",
+     "amount": 100
+}

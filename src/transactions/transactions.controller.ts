@@ -17,6 +17,7 @@ import {
   PaystackWebhookDto,
 } from './dtos/paystack-res.dto';
 import { Transaction } from './entities/transactions.entity';
+import { WithdrawDto } from './dtos/withdraw.dto';
 
 @Controller('transactions')
 export class TransactionsController {
@@ -25,6 +26,11 @@ export class TransactionsController {
   @Post('deposit')
   public deposit(@Body() depositDto: DepositDto) {
     return this.transactionsService.initTransaction(depositDto);
+  }
+
+  @Post('withdraw')
+  public withdraw(@Body() withdrawDto: WithdrawDto) {
+    return this.transactionsService.withdraw(withdrawDto);
   }
 
   @Get('/callback')

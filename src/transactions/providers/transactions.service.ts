@@ -1,16 +1,14 @@
 import {
+  BadRequestException,
   ConflictException,
-  HttpCode,
   HttpStatus,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
-  RequestTimeoutException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transaction } from '../entities/transactions.entity';
-import { Repository } from 'typeorm';
-import { User } from 'src/users/entities/user.entity';
+import { DataSource, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosResponse } from 'axios';
 import {
@@ -24,7 +22,6 @@ import { UsersService } from 'src/users/providers/users.service';
 import { transactionType } from '../enums/transactionType.enum';
 import { TransactionDto } from '../dtos/transaction.dto';
 import {
-  PaystackCallbackDto,
   PaystackCreateTransactionDto,
   PaystackCreateTransactionResponseDto,
   PaystackVerifyTransactionResponseDto,
@@ -32,6 +29,9 @@ import {
 } from '../dtos/paystack-res.dto';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { transactionStatus } from '../enums/transactionStatus.enum';
+import { WithdrawDto } from '../dtos/withdraw.dto';
+import { use } from 'passport';
+import { User } from 'src/users/entities/user.entity';
 
 @Injectable()
 export class TransactionsService {
@@ -45,7 +45,79 @@ export class TransactionsService {
 
     @InjectRepository(Transaction)
     private readonly txnRepository: Repository<Transaction>,
+
+    private readonly dataSource: DataSource,
   ) {}
+
+  async withdraw(withdrawDto: WithdrawDto) {
+    //Fetch user
+    let user = await this.usersService.findUser(withdrawDto.userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    // Convert withdrawal amount to kobo
+    withdrawDto.amount = withdrawDto.amount * 100;
+    if (Number(user.balance) < withdrawDto.amount) {
+      throw new BadRequestException('Insufficient funds.');
+    }
+
+    const queryRunner = this.dataSource.createQueryRunner();
+    // Deduct user balance
+    user.balance = Number(user.balance) - withdrawDto.amount;
+
+    try {
+      await queryRunner.connect();
+      await queryRunner.startTransaction();
+    } catch (error) {
+      throw new InternalServerErrorException(
+        'Could not connect to the database.',
+      );
+    }
+
+    try {
+      // Save user
+      await queryRunner.manager.save(User, user);
+
+      let transactionDto: TransactionDto = {
+        type: transactionType.WITHDRAWAL,
+        amount: withdrawDto.amount,
+        transaction_ref: this.generateString(10),
+        access_code: this.generateString(15),
+        user: user,
+        accountName: withdrawDto.accountName,
+        accountNumber: withdrawDto.accountNumber,
+        remarks: withdrawDto.remarks,
+      };
+      let newTxn = queryRunner.manager.create(Transaction, transactionDto);
+      newTxn.status = transactionStatus.SUCCESSFUL;
+      await queryRunner.manager.save(newTxn);
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw new ConflictException('Could not complete the transaction', {
+        description: String(error),
+      });
+    } finally {
+      try {
+        await queryRunner.release();
+      } catch (error) {
+        throw new InternalServerErrorException(
+          'Could not release the connection',
+          {
+            description: String(error),
+          },
+        );
+      }
+    }
+
+    delete user.password;
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Withdrawal successful',
+      data: { user },
+    };
+  }
 
   async initTransaction(depositDto: DepositDto) {
     // Find the user
@@ -79,21 +151,22 @@ export class TransactionsService {
         },
       });
       result = response.data;
-    } catch (error) {
-    }
+    } catch (error) {}
 
     if (!result)
       throw new InternalServerErrorException(
         'Unable to checkout to payment gateway',
       );
 
-    let txn = new TransactionDto();
-    txn.amount = depositDto.amount * 100;
-    txn.access_code = result.data.access_code;
-    txn.transaction_ref = result.data.reference;
-    txn.type = transactionType.DEPOSIT;
-    txn.user = user;
+    let txn: TransactionDto = {
+      amount: depositDto.amount * 100,
+      access_code: result.data.access_code,
+      transaction_ref: result.data.reference,
+      type: transactionType.DEPOSIT,
+      user: user,
+    };
 
+    // Check if duplicate txn exists
     let txnExists = undefined;
     try {
       txnExists = await this.txnRepository.findOne({
@@ -117,6 +190,7 @@ export class TransactionsService {
         },
       });
 
+    // Save transaction
     const newTxn = this.txnRepository.create(txn);
 
     try {
@@ -137,6 +211,7 @@ export class TransactionsService {
   }
 
   async verifyTransaction(ref: string): Promise<Transaction | null> {
+    // Find transaction with given reference
     const transaction = await this.txnRepository.findOne({
       where: {
         transaction_ref: ref,
@@ -146,14 +221,19 @@ export class TransactionsService {
     if (!transaction) {
       return null;
     }
-    if (transaction.status == transactionStatus.SUCCESSFUL) {
+
+    // If transaction has already been processed
+    if (
+      transaction.status == transactionStatus.SUCCESSFUL ||
+      transaction.status == transactionStatus.FAILED
+    ) {
       return transaction;
     }
 
-    const url = `${PAYSTACK_TRANSACTION_VERIFY_BASE_URL}/${ref}`;
     let response: AxiosResponse<PaystackVerifyTransactionResponseDto>;
 
     try {
+      const url = `${PAYSTACK_TRANSACTION_VERIFY_BASE_URL}/${ref}`;
       response = await axios.get<PaystackVerifyTransactionResponseDto>(url, {
         headers: {
           Authorization: `Bearer ${this.configService.get<string>(
@@ -227,6 +307,10 @@ export class TransactionsService {
 
     if (paymentConfirmed) {
       transaction.status = transactionStatus.SUCCESSFUL;
+      transaction.user = await this.usersService.updateUserBalance(
+        transaction.amount,
+        transaction.user.id,
+      );
     } else {
       transaction.status = transactionStatus.FAILED;
     }
@@ -234,5 +318,18 @@ export class TransactionsService {
     await this.txnRepository.save(transaction);
 
     return true;
+  }
+
+  generateString(length: number): string {
+    const chars =
+      'QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm1234567890';
+    let result = '';
+
+    for (let i = 0; i < length; i++) {
+      const randomIndex = Math.floor(Math.random() * chars.length);
+      result += chars[randomIndex];
+    }
+
+    return result;
   }
 }

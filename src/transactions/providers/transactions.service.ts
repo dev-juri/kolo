@@ -64,6 +64,8 @@ export class TransactionsService {
     // Deduct user balance
     user.balance = Number(user.balance) - withdrawDto.amount;
 
+    let newTxn = undefined;
+
     try {
       await queryRunner.connect();
       await queryRunner.startTransaction();
@@ -87,7 +89,7 @@ export class TransactionsService {
         accountNumber: withdrawDto.accountNumber,
         remarks: withdrawDto.remarks,
       };
-      let newTxn = queryRunner.manager.create(Transaction, transactionDto);
+      newTxn = queryRunner.manager.create(Transaction, transactionDto);
       newTxn.status = transactionStatus.SUCCESSFUL;
       await queryRunner.manager.save(newTxn);
 
@@ -115,7 +117,7 @@ export class TransactionsService {
     return {
       statusCode: HttpStatus.OK,
       message: 'Withdrawal successful',
-      data: { user },
+      data: { transaction: newTxn },
     };
   }
 
@@ -215,6 +217,9 @@ export class TransactionsService {
     const transaction = await this.txnRepository.findOne({
       where: {
         transaction_ref: ref,
+      },
+      relations: {
+        user: true,
       },
     });
 
@@ -320,6 +325,21 @@ export class TransactionsService {
     return true;
   }
 
+  async findTransactionsForUser(userId: number) {
+    let user = await this.usersService.findUserWithTransactions(userId);
+    if (!user) throw new NotFoundException('User does not exist');
+
+    return {
+      statusCode: HttpStatus.OK,
+      message: 'Transactions fetched successfully',
+      data: {
+        userId: user.id,
+        transactions: user.transactions,
+      },
+    };
+  }
+
+  // Generate mock reference and access codes, for the withdrawal process
   generateString(length: number): string {
     const chars =
       'QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm1234567890';

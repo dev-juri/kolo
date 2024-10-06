@@ -6,6 +6,8 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseIntPipe,
   Post,
   Query,
 } from '@nestjs/common';
@@ -31,6 +33,11 @@ export class TransactionsController {
   @Post('withdraw')
   public withdraw(@Body() withdrawDto: WithdrawDto) {
     return this.transactionsService.withdraw(withdrawDto);
+  }
+
+  @Get('/:userId')
+  public fetchUserTransactions(@Param('userId', ParseIntPipe) userId: number) {
+    return this.transactionsService.findTransactionsForUser(userId)
   }
 
   @Get('/callback')

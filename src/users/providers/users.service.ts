@@ -100,6 +100,7 @@ export class UsersService {
       );
     }
 
+    delete user.password;
     return user;
   }
 
@@ -120,5 +121,27 @@ export class UsersService {
     user.balance = Number(user.balance) + Number(amount);
 
     return await this.usersRepository.save(user);
+  }
+
+  async findUserWithTransactions(userId): Promise<User> | null {
+    let user = undefined;
+
+    try {
+      user = await this.usersRepository.findOne({
+        where: {
+          id: userId,
+        },
+        relations: {
+          transactions: true,
+        },
+      });
+    } catch (error) {
+      throw new InternalServerErrorException(
+        'Unable to connect to the database',
+      );
+    }
+
+    delete user.password;
+    return user;
   }
 }

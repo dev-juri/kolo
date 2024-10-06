@@ -5,5 +5,5 @@ Content-Type: application/json
     "userId": 1,
     "accountName": "Ojuri Oluwafemi",
     "accountNumber": "0449541114",
-     "amount": 100
+     "amount": 10
 }

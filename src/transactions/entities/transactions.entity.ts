@@ -73,8 +73,6 @@ export class Transaction {
   })
   remarks?: string;
 
-  @ManyToOne(() => User, (user) => user.transactions, {
-    eager: true,
-  })
+  @ManyToOne(() => User, (user) => user.transactions)
   user: User;
 }

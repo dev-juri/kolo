@@ -100,7 +100,7 @@ export class UsersService {
       );
     }
 
-    delete user.password;
+    if (user) delete user.password;
     return user;
   }
 

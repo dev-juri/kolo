@@ -15,7 +15,6 @@ import { TransactionsService } from './providers/transactions.service';
 import { DepositDto } from './dtos/deposit.dto';
 import { PAYSTACK_WEBHOOK_SIGNATURE_KEY } from 'src/constants';
 import {
-  PaystackCallbackDto,
   PaystackWebhookDto,
 } from './dtos/paystack-res.dto';
 import { Transaction } from './entities/transactions.entity';

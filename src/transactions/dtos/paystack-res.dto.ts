@@ -32,7 +32,7 @@ export type Data = {
   status?: string;
   reference?: string;
   amount?: number;
-
+  fees_breakdown?: any;
   gateway_response?: string;
   paid_at?: string;
   created_at?: string;
@@ -40,13 +40,20 @@ export type Data = {
   currency?: string;
   ip_address?: string;
   metadata?: any;
-
+  fees_split?: any;
   message?: any;
   fees: any;
-  log: any;
-  customer: any;
-  authorization: any;
-  plan: any;
+  log?: any;
+  customer?: any;
+  authorization?: any;
+  plan?: any;
+  subaccount?: any;
+  split?: any;
+  order_id?: any;
+  paidAt ?: any;
+  requested_amount ?: any;
+  pos_transaction_data ?: any;
+  source ?: any
 };
 
 export class PaystackCallbackDto {

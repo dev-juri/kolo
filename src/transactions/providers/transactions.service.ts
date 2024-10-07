@@ -132,13 +132,6 @@ export class TransactionsService {
       amount: depositDto.amount * 100,
     };
 
-    const paystackCallbackUrl = this.configService.get(
-      'paystackConfig.callbackUrl',
-    );
-    if (paystackCallbackUrl) {
-      paystackCreateTransactionDto.callback_url = paystackCallbackUrl;
-    }
-
     // Initiate transaction
     let payload = JSON.stringify(paystackCreateTransactionDto);
 
@@ -281,8 +274,6 @@ export class TransactionsService {
       return false;
     }
 
-    let isValidEvent = false;
-
     try {
       const hash = createHmac(
         PAYSTACK_WEBHOOK_CRYPTO_ALGO,
@@ -291,38 +282,23 @@ export class TransactionsService {
         .update(JSON.stringify(dto))
         .digest('hex');
 
-      isValidEvent =
-        hash &&
-        signature &&
-        timingSafeEqual(Buffer.from(hash), Buffer.from(signature));
+      // isValidEvent =
+      //   hash &&
+      //   signature &&
+      //   timingSafeEqual(Buffer.from(hash), Buffer.from(signature));
+      if(hash !== signature) {
+        return false
+      }
     } catch (error) {}
 
-    if (!isValidEvent) {
-      return false;
+    if(dto.event === 'charge.success') {
+      const reference = dto.data.reference;
+      const amount = dto.data.amount;
+      const status = dto.data.status;
+      let res = await this.verifyTransaction(reference)
     }
 
-    const transaction = await this.txnRepository.findOne({
-      where: {
-        transaction_ref: dto.data.reference,
-      },
-    });
-
-    const txnStatus = dto.data.status;
-    const paymentConfirmed = txnStatus === PAYSTACK_SUCCESS_STATUS;
-
-    if (paymentConfirmed) {
-      transaction.status = transactionStatus.SUCCESSFUL;
-      transaction.user = await this.usersService.updateUserBalance(
-        transaction.amount,
-        transaction.user.id,
-      );
-    } else {
-      transaction.status = transactionStatus.FAILED;
-    }
-
-    await this.txnRepository.save(transaction);
-
-    return true;
+    return true
   }
 
   async findTransactionsForUser(userId: number) {

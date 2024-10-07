@@ -27,9 +27,6 @@ export class ValidationExceptionFilter implements ExceptionFilter {
     }
 
     // Default handling for other BadRequestExceptions
-    return response.status(status).json({
-      statusCode: status,
-      error: exceptionResponse.message,
-    });
+    return response.status(status).json(exceptionResponse);
   }
 }

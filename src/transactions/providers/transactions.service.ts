@@ -206,28 +206,6 @@ export class TransactionsService {
   }
 
   async verifyTransaction(ref: string): Promise<Transaction | null> {
-    // Find transaction with given reference
-    const transaction = await this.txnRepository.findOne({
-      where: {
-        transaction_ref: ref,
-      },
-      relations: {
-        user: true,
-      },
-    });
-
-    if (!transaction) {
-      return null;
-    }
-
-    // If transaction has already been processed
-    if (
-      transaction.status == transactionStatus.SUCCESSFUL ||
-      transaction.status == transactionStatus.FAILED
-    ) {
-      return transaction;
-    }
-
     let response: AxiosResponse<PaystackVerifyTransactionResponseDto>;
 
     try {
@@ -248,22 +226,8 @@ export class TransactionsService {
     const result = response.data;
 
     const txnStatus = result?.data?.status;
-    const paymentConfirmed = txnStatus === PAYSTACK_SUCCESS_STATUS;
 
-    if (paymentConfirmed) {
-      transaction.status = transactionStatus.SUCCESSFUL;
-
-      transaction.user = await this.usersService.updateUserBalance(
-        transaction.amount,
-        transaction.user.id,
-      );
-    } else {
-      transaction.status = transactionStatus.FAILED;
-    }
-
-    delete transaction.user.password;
-
-    return await this.txnRepository.save(transaction);
+    await this.updateTransaction(ref, txnStatus)
   }
 
   async handlePaystackWebhook(
@@ -286,19 +250,59 @@ export class TransactionsService {
       //   hash &&
       //   signature &&
       //   timingSafeEqual(Buffer.from(hash), Buffer.from(signature));
-      if(hash !== signature) {
-        return false
+      if (hash !== signature) {
+        return false;
       }
     } catch (error) {}
 
-    if(dto.event === 'charge.success') {
+    if (dto.event === 'charge.success') {
       const reference = dto.data.reference;
-      const amount = dto.data.amount;
       const status = dto.data.status;
-      let res = await this.verifyTransaction(reference)
+      let res = await this.updateTransaction(reference, status);
     }
 
-    return true
+    return true;
+  }
+
+  async updateTransaction(ref: string, status?: string) {
+    // Find transaction with given reference
+    const transaction = await this.txnRepository.findOne({
+      where: {
+        transaction_ref: ref,
+      },
+      relations: {
+        user: true,
+      },
+    });
+
+    if (!transaction) {
+      return null;
+    }
+
+    // If transaction has already been processed
+    if (
+      transaction.status == transactionStatus.SUCCESSFUL ||
+      transaction.status == transactionStatus.FAILED
+    ) {
+      return transaction;
+    }
+
+    const paymentConfirmed = status === PAYSTACK_SUCCESS_STATUS;
+
+    if (paymentConfirmed) {
+      transaction.status = transactionStatus.SUCCESSFUL;
+
+      transaction.user = await this.usersService.updateUserBalance(
+        transaction.amount,
+        transaction.user.id,
+      );
+    } else {
+      transaction.status = transactionStatus.FAILED;
+    }
+
+    delete transaction.user.password;
+
+    return await this.txnRepository.save(transaction);
   }
 
   async findTransactionsForUser(userId: number) {

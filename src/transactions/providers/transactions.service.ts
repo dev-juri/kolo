@@ -217,7 +217,9 @@ export class TransactionsService {
           )}`,
         },
       });
-    } catch (error) {}
+    } catch (error) {
+      throw new InternalServerErrorException('Unable to verify transaction')
+    }
 
     if (!response) {
       return null;

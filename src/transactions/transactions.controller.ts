@@ -40,8 +40,8 @@ export class TransactionsController {
     return this.transactionsService.findTransactionsForUser(userId);
   }
 
+  @Get('/verify')
   async verifyTransaction(
-    @Query('trxref') trxref: string,
     @Query('reference') reference: string,
   ): Promise<Transaction> {
     return await this.transactionsService.verifyTransaction(reference);

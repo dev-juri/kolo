@@ -30,7 +30,8 @@ export class UsersService {
   ) {}
 
   async createUser(createUserDto: CreateUserDto) {
-    const { email, phoneNumber } = createUserDto;
+    let { email, phoneNumber } = createUserDto;
+    email = email.toLowerCase();
 
     const userExists = await this.usersRepository.findOne({
       where: [{ email }, { phoneNumber }],
@@ -56,8 +57,9 @@ export class UsersService {
   }
 
   async loginUser(loginUserDto: LoginUserDto) {
-    const { email, password } = loginUserDto;
-
+    let { email, password } = loginUserDto;
+    email = email.toLowerCase();
+    
     let user = undefined;
 
     try {

@@ -12,6 +12,7 @@ import { DataSource, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosResponse } from 'axios';
 import {
+  generateString,
   PAYSTACK_INIT_TRANSACTION,
   PAYSTACK_SUCCESS_STATUS,
   PAYSTACK_TRANSACTION_VERIFY_BASE_URL,
@@ -33,6 +34,8 @@ import { transactionStatus } from '../enums/transactionStatus.enum';
 import { WithdrawDto } from '../dtos/withdraw.dto';
 import { use } from 'passport';
 import { User } from 'src/users/entities/user.entity';
+import { FamilyService } from 'src/family/providers/family.service';
+import { Family } from 'src/family/entities/family.entity';
 
 @Injectable()
 export class TransactionsService {
@@ -43,6 +46,8 @@ export class TransactionsService {
     private readonly configService: ConfigService,
 
     private readonly usersService: UsersService,
+
+    private readonly familyService: FamilyService,
 
     @InjectRepository(Transaction)
     private readonly txnRepository: Repository<Transaction>,
@@ -55,15 +60,18 @@ export class TransactionsService {
     let user = await this.usersService.findUser(withdrawDto.userId);
     if (!user) throw new NotFoundException('User not found');
 
+    let family = await this.familyService.findFamily(withdrawDto.familyId);
+    if (!family) throw new NotFoundException('Family not found');
+
     // Convert withdrawal amount to kobo
     withdrawDto.amount = withdrawDto.amount * 100;
-    if (Number(user.balance) < withdrawDto.amount) {
+    if (Number(family.balance) < withdrawDto.amount) {
       throw new BadRequestException('Insufficient funds.');
     }
 
     const queryRunner = this.dataSource.createQueryRunner();
     // Deduct user balance
-    user.balance = Number(user.balance) - withdrawDto.amount;
+    family.balance = Number(family.balance) - withdrawDto.amount;
 
     let newTxn = undefined;
 
@@ -78,17 +86,18 @@ export class TransactionsService {
 
     try {
       // Save user
-      await queryRunner.manager.save(User, user);
+      await queryRunner.manager.save(Family, family);
 
       let transactionDto: TransactionDto = {
         type: transactionType.WITHDRAWAL,
         amount: withdrawDto.amount,
-        transaction_ref: this.generateString(10),
-        access_code: this.generateString(15),
+        transaction_ref: generateString(10),
+        access_code: generateString(15),
         user: user,
         accountName: withdrawDto.accountName,
         accountNumber: withdrawDto.accountNumber,
         remarks: withdrawDto.remarks,
+        family: family
       };
       newTxn = queryRunner.manager.create(Transaction, transactionDto);
       newTxn.status = transactionStatus.SUCCESSFUL;
@@ -118,7 +127,7 @@ export class TransactionsService {
     return {
       statusCode: HttpStatus.OK,
       message: 'Withdrawal successful',
-      data: { userId: user.id, balance: user.balance, transaction: newTxn },
+      data: { userId: user.id, balance: family.balance, transaction: newTxn },
     };
   }
 
@@ -127,6 +136,9 @@ export class TransactionsService {
     let user = await this.usersService.findUser(depositDto.userId);
 
     if (!user) throw new NotFoundException('User does not exist');
+
+    let family = await this.familyService.findFamily(depositDto.familyId)
+    if (!family) throw new NotFoundException('Family does not exist');
 
     const paystackCreateTransactionDto: PaystackCreateTransactionDto = {
       email: user.email,
@@ -137,7 +149,7 @@ export class TransactionsService {
 
     let cancelUrl = this.configService.get<string>('paystack.callbackUrl')
     let metaDataDto : MetaDataDto = {
-      cancel_action : this.configService.get<string>('paystack.cancelUrl')
+      cancel_action : cancelUrl
     }
     
     paystackCreateTransactionDto.callback_url = callbackUrl
@@ -170,6 +182,7 @@ export class TransactionsService {
       transaction_ref: result.data.reference,
       type: transactionType.DEPOSIT,
       user: user,
+      family: family
     };
 
     // Check if duplicate txn exists
@@ -284,7 +297,7 @@ export class TransactionsService {
         transaction_ref: ref,
       },
       relations: {
-        user: true,
+        family: true,
       },
     });
 
@@ -305,45 +318,29 @@ export class TransactionsService {
     if (paymentConfirmed) {
       transaction.status = transactionStatus.SUCCESSFUL;
 
-      transaction.user = await this.usersService.updateUserBalance(
+      transaction.family = await this.familyService.updateFamilyBalance(
         transaction.amount,
-        transaction.user.id,
+        transaction.family.id,
       );
     } else {
       transaction.status = transactionStatus.FAILED;
     }
 
-    delete transaction.user.password;
-
     return await this.txnRepository.save(transaction);
   }
 
-  async findTransactionsForUser(userId: number) {
-    let user = await this.usersService.findUserWithTransactions(userId);
-    if (!user) throw new NotFoundException('User does not exist');
+  async findTransactionsForFamily(familyId: number) {
+    let family = await this.familyService.findFamily(familyId);
+    if (!family) throw new NotFoundException('Family does not exist');
 
     return {
       statusCode: HttpStatus.OK,
       message: 'Transactions fetched successfully',
       data: {
-        userId: user.id,
-        balance: user.balance,
-        transactions: user.transactions,
+        userId: family.id,
+        balance: family.balance,
+        transactions: family.transactions,
       },
     };
-  }
-
-  // Generate mock reference and access codes, for the withdrawal process
-  generateString(length: number): string {
-    const chars =
-      'QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnm1234567890';
-    let result = '';
-
-    for (let i = 0; i < length; i++) {
-      const randomIndex = Math.floor(Math.random() * chars.length);
-      result += chars[randomIndex];
-    }
-
-    return result;
   }
 }

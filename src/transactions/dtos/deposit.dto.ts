@@ -7,6 +7,10 @@ export class DepositDto {
   @IsNotEmpty()
   userId: number;
 
+  @IsInt()
+  @IsNotEmpty()
+  familyId: number;
+
   @IsNumber({
     maxDecimalPlaces: 2
   }, {

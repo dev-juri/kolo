@@ -8,6 +8,7 @@ import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import { User } from './users/entities/user.entity';
 import { TransactionsModule } from './transactions/transactions.module';
+import { FamilyModule } from './family/family.module';
 import paystackConfig from './config/paystack.config';
 
 const ENV = process.env.NODE_ENV;
@@ -37,6 +38,7 @@ console.log(ENV);
         autoLoadEntities: true,
       }),
     }),
+    FamilyModule,
   ],
   controllers: [AppController],
   providers: [AppService],

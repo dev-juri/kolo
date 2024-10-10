@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { transactionType } from '../enums/transactionType.enum';
 import { transactionStatus } from '../enums/transactionStatus.enum';
+import { Family } from 'src/family/entities/family.entity';
 
 @Entity('transactions')
 export class Transaction {
@@ -65,6 +66,12 @@ export class Transaction {
     nullable: true,
     type: 'varchar',
   })
+  bankName?: string;
+
+  @Column({
+    nullable: true,
+    type: 'varchar',
+  })
   accountNumber?: string;
 
   @Column({
@@ -73,6 +80,9 @@ export class Transaction {
   })
   remarks?: string;
 
-  @ManyToOne(() => User, (user) => user.transactions)
+  @ManyToOne(() => User)
   user: User;
+
+  @ManyToOne(() => Family, (family) => family.transactions)
+  family: Family;
 }

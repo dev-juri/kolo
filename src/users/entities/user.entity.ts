@@ -4,12 +4,14 @@ import {
   CreateDateColumn,
   Entity,
   JoinTable,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { Transaction } from 'src/transactions/entities/transactions.entity';
+import { Family } from 'src/family/entities/family.entity';
 
 @Entity('users')
 export class User {
@@ -29,19 +31,14 @@ export class User {
   @Column({ nullable: false })
   password: string;
 
-  @Column({ type: 'decimal', default: 0 })
-  balance: number;
+  @ManyToOne(() => Family, (family) => family.users)
+  family: Family;
 
   @CreateDateColumn()
   created: Date;
 
   @UpdateDateColumn()
   updated: Date;
-
-  @OneToMany(() => Transaction, (transaction) => transaction.user, {
-    cascade: true,
-  })
-  transactions: Transaction[];
 
   @BeforeInsert()
   async hashPassword() {

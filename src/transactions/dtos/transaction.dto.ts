@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
+import { Family } from 'src/family/entities/family.entity';
 
 export class TransactionDto {
   @IsEnum({
@@ -40,4 +41,6 @@ export class TransactionDto {
   remarks?: string;
 
   user: User;
+
+  family: Family
 }

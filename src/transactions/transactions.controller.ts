@@ -35,9 +35,9 @@ export class TransactionsController {
     return this.transactionsService.withdraw(withdrawDto);
   }
 
-  @Get('/:userId')
-  public fetchUserTransactions(@Param('userId', ParseIntPipe) userId: number) {
-    return this.transactionsService.findTransactionsForUser(userId);
+  @Get('/:familyId')
+  public fetchUserTransactions(@Param('familyId', ParseIntPipe) familyId: number) {
+    return this.transactionsService.findTransactionsForFamily(familyId);
   }
 
   @Get('/verify')

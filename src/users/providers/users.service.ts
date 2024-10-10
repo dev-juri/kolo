@@ -59,7 +59,7 @@ export class UsersService {
   async loginUser(loginUserDto: LoginUserDto) {
     let { email, password } = loginUserDto;
     email = email.toLowerCase();
-    
+
     let user = undefined;
 
     try {
@@ -106,44 +106,7 @@ export class UsersService {
     return user;
   }
 
-  async updateUserBalance(amount: number, userId: number) {
-    let user = undefined;
-
-    try {
-      user = await this.usersRepository.findOne({
-        where: {
-          id: userId,
-        },
-      });
-    } catch (error) {
-      throw new InternalServerErrorException(
-        'Unable to connect to the database',
-      );
-    }
-    user.balance = Number(user.balance) + Number(amount);
-
+  async updateUser(user: User): Promise<User> {
     return await this.usersRepository.save(user);
-  }
-
-  async findUserWithTransactions(userId): Promise<User> | null {
-    let user = undefined;
-
-    try {
-      user = await this.usersRepository.findOne({
-        where: {
-          id: userId,
-        },
-        relations: {
-          transactions: true,
-        },
-      });
-    } catch (error) {
-      throw new InternalServerErrorException(
-        'Unable to connect to the database',
-      );
-    }
-
-    delete user.password;
-    return user;
   }
 }

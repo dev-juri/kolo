@@ -1,0 +1,6 @@
+POST http://localhost:3000/family/join/8
+Content-Type: application/json
+
+{
+    "familyCode": "pEMG8"
+}

@@ -2,6 +2,7 @@ POST http://localhost:3000/transactions/deposit
 Content-Type: application/json
 
 {
-    "userId": 1,
-    "amount": 10000
+    "userId": 7,
+    "familyId": 2,
+    "amount": 50000
 }

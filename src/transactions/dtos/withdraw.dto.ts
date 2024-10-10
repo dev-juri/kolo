@@ -22,6 +22,10 @@ export class WithdrawDto {
   @MaxLength(10, { message: 'Account number must be 10 digits long' })
   accountNumber: string;
 
+  @IsString()
+  @IsNotEmpty()
+  bankName: string;
+
   @IsOptional()
   @IsString()
   remarks?: string;
@@ -38,4 +42,9 @@ export class WithdrawDto {
   @Type(() => Number)
   @IsNotEmpty()
   amount: number;
+
+  @IsInt()
+  @IsNotEmpty()
+  familyId: number;
+
 }

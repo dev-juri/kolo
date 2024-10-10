@@ -1,5 +1,6 @@
 import {
   ForbiddenException,
+  HttpStatus,
   Injectable,
   InternalServerErrorException,
   NotFoundException,
@@ -20,7 +21,7 @@ export class FamilyService {
     private readonly usersService: UsersService,
   ) {}
 
-  async createFamily(dto: CreateFamilyDto, userId: number): Promise<Family> {
+  async createFamily(dto: CreateFamilyDto, userId: number) {
     const family = this.familyRepo.create(dto);
     const user = await this.usersService.findUser(userId);
     if (!user) throw new NotFoundException('User not found');
@@ -34,10 +35,16 @@ export class FamilyService {
     family.ownerId = userId;
     await this.familyRepo.save(family);
 
-    return family;
+    if(family.transactions) delete family.transactions
+
+    return {
+      message: 'Family created successfully',
+      data: { family: family },
+      statusCode: HttpStatus.CREATED,
+    };
   }
 
-  async joinFamily(dto: JoinFamilyDto, userId: number): Promise<Family> {
+  async joinFamily(dto: JoinFamilyDto, userId: number) {
     const family = await this.familyRepo.findOne({
       where: { familyCode: dto.familyCode },
     });
@@ -51,7 +58,13 @@ export class FamilyService {
     user.family = family;
     await this.usersService.updateUser(user);
 
-    return family;
+    if(family.transactions) delete family.transactions
+
+    return {
+      message: 'Family joined successfully',
+      data: { family: family },
+      statusCode: HttpStatus.CREATED,
+    };
   }
 
   async findFamily(familyId: number) {
@@ -89,7 +102,6 @@ export class FamilyService {
     return familyCode;
   }
 
-  
   async updateFamilyBalance(amount: number, familyId: number) {
     let family = undefined;
 

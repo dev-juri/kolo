@@ -127,7 +127,7 @@ export class TransactionsService {
     return {
       statusCode: HttpStatus.OK,
       message: 'Withdrawal successful',
-      data: { userId: user.id, balance: family.balance, transaction: newTxn },
+      data: { familyId: family.id, balance: family.balance, transaction: newTxn },
     };
   }
 
@@ -337,7 +337,7 @@ export class TransactionsService {
       statusCode: HttpStatus.OK,
       message: 'Transactions fetched successfully',
       data: {
-        userId: family.id,
+        familyId: family.id,
         balance: family.balance,
         transactions: family.transactions,
       },

@@ -4,7 +4,12 @@ export type PaystackCreateTransactionDto = {
   amount: number;
   email: string;
   callback_url?: string;
+  metadata?: MetaDataDto
 };
+
+export type MetaDataDto = {
+  cancel_action : string
+}
 
 export type PaystackCreateTransactionResponseDto = {
   status: boolean;

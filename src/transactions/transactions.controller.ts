@@ -47,6 +47,17 @@ export class TransactionsController {
     return await this.transactionsService.verifyTransaction(reference);
   }
 
+  @Get('/callback')
+  async callbackHandler(
+    @Query('trxref') trxref: string,
+    @Query('reference') reference: string,
+  ) {
+    this.transactionsService.verifyTransaction(trxref)
+  }
+
+  @Get('/cancel')
+  async cancelHandler() {}
+
   @Post('/webhook')
   @HttpCode(HttpStatus.OK)
   async paymentWebhookHandler(@Req() req: Request, @Res() res: Response) {

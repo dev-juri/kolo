@@ -22,6 +22,7 @@ import { UsersService } from 'src/users/providers/users.service';
 import { transactionType } from '../enums/transactionType.enum';
 import { TransactionDto } from '../dtos/transaction.dto';
 import {
+  MetaDataDto,
   PaystackCreateTransactionDto,
   PaystackCreateTransactionResponseDto,
   PaystackVerifyTransactionResponseDto,
@@ -117,7 +118,7 @@ export class TransactionsService {
     return {
       statusCode: HttpStatus.OK,
       message: 'Withdrawal successful',
-      data: { transaction: newTxn },
+      data: { userId: user.id, balance: user.balance, transaction: newTxn },
     };
   }
 
@@ -131,6 +132,16 @@ export class TransactionsService {
       email: user.email,
       amount: depositDto.amount * 100,
     };
+
+    let callbackUrl = this.configService.get<string>('paystack.callbackUrl')
+
+    let cancelUrl = this.configService.get<string>('paystack.callbackUrl')
+    let metaDataDto : MetaDataDto = {
+      cancel_action : this.configService.get<string>('paystack.cancelUrl')
+    }
+    
+    paystackCreateTransactionDto.callback_url = callbackUrl
+    paystackCreateTransactionDto.metadata = metaDataDto
 
     // Initiate transaction
     let payload = JSON.stringify(paystackCreateTransactionDto);
@@ -218,7 +229,7 @@ export class TransactionsService {
         },
       });
     } catch (error) {
-      throw new InternalServerErrorException('Unable to verify transaction')
+      throw new InternalServerErrorException('Unable to verify transaction');
     }
 
     if (!response) {
@@ -229,7 +240,7 @@ export class TransactionsService {
 
     const txnStatus = result?.data?.status;
 
-    await this.updateTransaction(ref, txnStatus)
+    return await this.updateTransaction(ref, txnStatus);
   }
 
   async handlePaystackWebhook(
@@ -316,6 +327,7 @@ export class TransactionsService {
       message: 'Transactions fetched successfully',
       data: {
         userId: user.id,
+        balance: user.balance,
         transactions: user.transactions,
       },
     };

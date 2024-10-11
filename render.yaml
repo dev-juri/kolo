@@ -35,6 +35,6 @@ services:
 
 databases:
   - name: kolo-db
-    type: postgres
+    postgresMajorVersion: "16"
     region: oregon
     databaseName: kolo_fs

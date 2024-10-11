@@ -4,8 +4,6 @@ import {
   ArgumentsHost,
   BadRequestException,
 } from '@nestjs/common';
-import { ValidationError } from 'class-validator';
-import { error } from 'console';
 import { Response } from 'express';
 
 @Catch(BadRequestException)

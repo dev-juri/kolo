@@ -29,11 +29,9 @@ import {
   PaystackVerifyTransactionResponseDto,
   PaystackWebhookDto,
 } from '../dtos/paystack-res.dto';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac } from 'crypto';
 import { transactionStatus } from '../enums/transactionStatus.enum';
 import { WithdrawDto } from '../dtos/withdraw.dto';
-import { use } from 'passport';
-import { User } from 'src/users/entities/user.entity';
 import { FamilyService } from 'src/family/providers/family.service';
 import { Family } from 'src/family/entities/family.entity';
 
@@ -97,7 +95,7 @@ export class TransactionsService {
         accountName: withdrawDto.accountName,
         accountNumber: withdrawDto.accountNumber,
         remarks: withdrawDto.remarks,
-        family: family
+        family: family,
       };
       newTxn = queryRunner.manager.create(Transaction, transactionDto);
       newTxn.status = transactionStatus.SUCCESSFUL;
@@ -127,7 +125,11 @@ export class TransactionsService {
     return {
       statusCode: HttpStatus.OK,
       message: 'Withdrawal successful',
-      data: { familyId: family.id, balance: family.balance, transaction: newTxn },
+      data: {
+        familyId: family.id,
+        balance: family.balance,
+        transaction: newTxn,
+      },
     };
   }
 
@@ -137,7 +139,7 @@ export class TransactionsService {
 
     if (!user) throw new NotFoundException('User does not exist');
 
-    let family = await this.familyService.findFamily(depositDto.familyId)
+    let family = await this.familyService.findFamily(depositDto.familyId);
     if (!family) throw new NotFoundException('Family does not exist');
 
     const paystackCreateTransactionDto: PaystackCreateTransactionDto = {
@@ -145,15 +147,15 @@ export class TransactionsService {
       amount: depositDto.amount * 100,
     };
 
-    let callbackUrl = this.configService.get<string>('paystack.callbackUrl')
+    let callbackUrl = this.configService.get<string>('paystack.callbackUrl');
 
-    let cancelUrl = this.configService.get<string>('paystack.callbackUrl')
-    let metaDataDto : MetaDataDto = {
-      cancel_action : cancelUrl
-    }
-    
-    paystackCreateTransactionDto.callback_url = callbackUrl
-    paystackCreateTransactionDto.metadata = metaDataDto
+    let cancelUrl = this.configService.get<string>('paystack.callbackUrl');
+    let metaDataDto: MetaDataDto = {
+      cancel_action: cancelUrl,
+    };
+
+    paystackCreateTransactionDto.callback_url = callbackUrl;
+    paystackCreateTransactionDto.metadata = metaDataDto;
 
     // Initiate transaction
     let payload = JSON.stringify(paystackCreateTransactionDto);
@@ -182,7 +184,7 @@ export class TransactionsService {
       transaction_ref: result.data.reference,
       type: transactionType.DEPOSIT,
       user: user,
-      family: family
+      family: family,
     };
 
     // Check if duplicate txn exists

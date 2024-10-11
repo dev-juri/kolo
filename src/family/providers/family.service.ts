@@ -6,7 +6,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { User } from 'src/users/entities/user.entity';
 import { Repository } from 'typeorm';
 import { CreateFamilyDto } from '../dto/create-family.dto';
 import { JoinFamilyDto } from '../dto/update-family.dto';
@@ -35,7 +34,7 @@ export class FamilyService {
     family.ownerId = userId;
     await this.familyRepo.save(family);
 
-    if(family.transactions) delete family.transactions
+    if (family.transactions) delete family.transactions;
 
     return {
       message: 'Family created successfully',
@@ -58,7 +57,7 @@ export class FamilyService {
     user.family = family;
     await this.usersService.updateUser(user);
 
-    if(family.transactions) delete family.transactions
+    if (family.transactions) delete family.transactions;
 
     return {
       message: 'Family joined successfully',

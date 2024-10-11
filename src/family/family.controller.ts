@@ -1,13 +1,23 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseIntPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Param,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { FamilyService } from './providers/family.service';
 import { CreateFamilyDto } from './dto/create-family.dto';
-import { JoinFamilyDto, UpdateFamilyDto } from './dto/update-family.dto';
-import { TransactionDto } from 'src/transactions/dtos/transaction.dto';
+import { JoinFamilyDto } from './dto/update-family.dto';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Family')
 @Controller('family')
 export class FamilyController {
   constructor(private readonly familyService: FamilyService) {}
 
+  @ApiOperation({
+    summary: 'Use this endpoint to create a new family',
+  })
   @Post('create/:userId')
   createFamily(
     @Param('userId', ParseIntPipe) userId: number,
@@ -16,6 +26,9 @@ export class FamilyController {
     return this.familyService.createFamily(dto, userId);
   }
 
+  @ApiOperation({
+    summary: 'Use this endpoint to join a new family',
+  })
   @Post('join/:userId')
   joinFamily(
     @Param('userId', ParseIntPipe) userId: number,
@@ -24,4 +37,3 @@ export class FamilyController {
     return this.familyService.joinFamily(dto, userId);
   }
 }
-

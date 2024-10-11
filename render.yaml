@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: kolo-be
+    env: node
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: DATABASE_HOST
+        fromDatabase:
+          name: kolo-db
+          property: host
+      - key: DATABASE_PORT
+        fromDatabase:
+          name: kolo-db
+          property: port
+      - key: DATABASE_USER
+        fromDatabase:
+          name: kolo-db
+          property: user
+      - key: DATABASE_PASS
+        fromDatabase:
+          name: kolo-db
+          property: password
+      - key: DATABASE_NAME
+        fromDatabase:
+          name: kolo-db
+          property: database
+      - key: PAYSTACK_CALLBACK_URL
+        value: ${PAYSTACK_CALLBACK_URL}
+      - key: PAYSTACK_PUBLIC_KEY
+        value: ${PAYSTACK_PUBLIC_KEY}
+      - key: PAYSTACK_SECRET_KEY
+        value: ${PAYSTACK_SECRET_KEY}
+
+databases:
+  - name: kolo-db
+    type: postgres
+    region: oregon
+    databaseName: kolo_fs

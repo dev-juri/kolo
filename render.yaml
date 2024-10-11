@@ -26,12 +26,6 @@ services:
         fromDatabase:
           name: kolo-db
           property: database
-      - key: PAYSTACK_CALLBACK_URL
-        value: ${PAYSTACK_CALLBACK_URL}
-      - key: PAYSTACK_PUBLIC_KEY
-        value: ${PAYSTACK_PUBLIC_KEY}
-      - key: PAYSTACK_SECRET_KEY
-        value: ${PAYSTACK_SECRET_KEY}
 
 databases:
   - name: kolo-db

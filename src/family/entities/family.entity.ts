@@ -1,6 +1,12 @@
 import { Transaction } from 'src/transactions/entities/transactions.entity';
 import { User } from 'src/users/entities/user.entity';
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany} from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  VersionColumn,
+} from 'typeorm';
 
 @Entity()
 export class Family {
@@ -16,13 +22,15 @@ export class Family {
   @Column({ type: 'decimal', default: 0 })
   balance: number;
 
-  @Column({type: 'numeric', nullable: false})
-  ownerId: number; 
+  @Column({ type: 'numeric', nullable: false })
+  ownerId: number;
 
   @OneToMany(() => User, (user) => user.family)
   users: User[];
 
   @OneToMany(() => Transaction, (transaction) => transaction.family)
   transactions: Transaction[];
-}
 
+  @VersionColumn({ default: 0 })
+  version: number;
+}

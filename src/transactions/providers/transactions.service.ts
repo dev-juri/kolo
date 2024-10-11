@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Transaction } from '../entities/transactions.entity';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, OptimisticLockVersionMismatchError, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosResponse } from 'axios';
 import {
@@ -54,74 +54,74 @@ export class TransactionsService {
   ) {}
 
   async withdraw(withdrawDto: WithdrawDto) {
-    //Fetch user
+    // Fetch user
     let user = await this.usersService.findUser(withdrawDto.userId);
     if (!user) throw new NotFoundException('User not found');
-
+  
     let family = await this.familyService.findFamily(withdrawDto.familyId);
     if (!family) throw new NotFoundException('Family not found');
-
+  
     // Convert withdrawal amount to kobo
     withdrawDto.amount = withdrawDto.amount * 100;
     if (Number(family.balance) < withdrawDto.amount) {
       throw new BadRequestException('Insufficient funds.');
     }
-
+  
     const queryRunner = this.dataSource.createQueryRunner();
+  
     // Deduct user balance
     family.balance = Number(family.balance) - withdrawDto.amount;
-
+  
     let newTxn = undefined;
-
+  
     try {
       await queryRunner.connect();
       await queryRunner.startTransaction();
+  
+      try {
+        await queryRunner.manager.save(Family, family, { reload: true });
+  
+        let transactionDto: TransactionDto = {
+          type: transactionType.WITHDRAWAL,
+          amount: withdrawDto.amount,
+          transaction_ref: generateString(10),
+          access_code: generateString(15),
+          user: user,
+          accountName: withdrawDto.accountName,
+          accountNumber: withdrawDto.accountNumber,
+          remarks: withdrawDto.remarks,
+          family: family,
+        };
+  
+        // Create the transaction and set its status to successful
+        newTxn = queryRunner.manager.create(Transaction, transactionDto);
+        newTxn.status = transactionStatus.SUCCESSFUL;
+        await queryRunner.manager.save(newTxn);
+  
+        await queryRunner.commitTransaction();
+      } catch (error) {
+        if (error instanceof OptimisticLockVersionMismatchError) {
+          throw new ConflictException('Concurrent modification detected. Please retry.');
+        }
+  
+        await queryRunner.rollbackTransaction();
+        throw new ConflictException('Could not complete the transaction', {
+          description: String(error),
+        });
+      }
     } catch (error) {
-      throw new InternalServerErrorException(
-        'Could not connect to the database.',
-      );
-    }
-
-    try {
-      // Save user
-      await queryRunner.manager.save(Family, family);
-
-      let transactionDto: TransactionDto = {
-        type: transactionType.WITHDRAWAL,
-        amount: withdrawDto.amount,
-        transaction_ref: generateString(10),
-        access_code: generateString(15),
-        user: user,
-        accountName: withdrawDto.accountName,
-        accountNumber: withdrawDto.accountNumber,
-        remarks: withdrawDto.remarks,
-        family: family,
-      };
-      newTxn = queryRunner.manager.create(Transaction, transactionDto);
-      newTxn.status = transactionStatus.SUCCESSFUL;
-      await queryRunner.manager.save(newTxn);
-
-      await queryRunner.commitTransaction();
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      throw new ConflictException('Could not complete the transaction', {
-        description: String(error),
-      });
+      throw new InternalServerErrorException('Could not connect to the database.');
     } finally {
       try {
         await queryRunner.release();
       } catch (error) {
-        throw new InternalServerErrorException(
-          'Could not release the connection',
-          {
-            description: String(error),
-          },
-        );
+        throw new InternalServerErrorException('Could not release the connection', {
+          description: String(error),
+        });
       }
     }
-
-    delete user.password;
-
+  
+    // Return response after successful transaction
     return {
       statusCode: HttpStatus.OK,
       message: 'Withdrawal successful',
@@ -132,6 +132,7 @@ export class TransactionsService {
       },
     };
   }
+  
 
   async initTransaction(depositDto: DepositDto) {
     // Find the user
